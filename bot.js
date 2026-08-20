@@ -2,36 +2,31 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    }
 });
 
-client.on('qr', qr => qrcode.generate(qr, {small: true}));
-client.on('ready', () => console.log('BOT ACORDEON FINAL LISTO'));
+client.on('qr', (qr) => {
+    console.log('ESCANEA ESTE QR:');
+    qrcode.generate(qr, { small: true });
+});
 
-client.on('message', async msg => {
-    try {
-        if (msg.fromMe) return;
-        const texto = msg.body.toLowerCase();
-        if (!texto) return;
+client.on('ready', () => {
+    console.log('BOT ACORDEON FINAL LISTO');
+});
 
-        const esChamba = texto.includes('acordeon') || texto.includes('acordeón') || texto.includes('acordeonista') || texto.includes('acordenista') || texto.includes('acordeonero');
-        const esIgnorar = texto.includes('yo voy') || texto.includes('yo mero') || texto.includes('si voy') || texto.includes('sí voy') || texto.includes('vendo') || texto.includes('se vende') || texto.includes('venta');
+client.on('message', async (msg) => {
+    const chat = await msg.getChat();
+    if (chat.isGroup) return;
 
-        if (esChamba && !esIgnorar) {
-            console.log('CHAMBA: ' + msg.body);
-            await fetch('https://ntfy.sh/chamba-acordeon-4492526620', {
-                method: 'POST',
-                body: `CHAMBA: ${msg.body}`,
-                headers: { 
-                    'Title': 'CHAMBA DE ACORDEON!', 
-                    'Priority': 'urgent', 
-                    'Tags': 'accordion,moneybag' 
-                }
-            });
-            console.log('Notificacion enviada OK!');
-        }
-    } catch (e) {
-        console.log('Error:', e.message);
+    if (msg.body.toLowerCase() === 'hola') {
+        msg.reply('Hola! Soy el bot de acordeones. Escribe *catalogo* para ver modelos.');
+    }
+    if (msg.body.toLowerCase() === 'catalogo') {
+        msg.reply('Aquí tienes el catálogo de acordeones disponibles 🎹🪗');
     }
 });
 
