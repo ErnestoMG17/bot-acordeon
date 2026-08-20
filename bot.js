@@ -6,25 +6,37 @@ const app = express()
 
 let qrCodeData = null
 let status = "Iniciando..."
-const TOPIC = "chamba-acordeon-4492526620"
+const TG_TOKEN = "8364493436:AAGb6WF2e84vZQJmW-btO5demFKQs0kcFGA"
+let CHAT_ID = null // se detecta solo
 
-function sendNtfy(titulo, mensaje){
-  return new Promise((resolve,reject)=>{
-    const req = https.request({
-      hostname: 'ntfy.sh',
-      path: `/${TOPIC}`,
-      method: 'POST',
-      headers: { 'Title': titulo, 'Priority': 'high' }
-    }, res => {
-      console.log("ntfy response:", res.statusCode)
-      resolve(res.statusCode)
+function sendTelegram(msg){
+  if(!CHAT_ID) return console.log("Aun no tengo CHAT_ID, manda hola a tu bot en Telegram")
+  const data = JSON.stringify({chat_id: CHAT_ID, text: msg})
+  const req = https.request({
+    hostname: 'api.telegram.org',
+    path: `/bot${TG_TOKEN}/sendMessage`,
+    method: 'POST',
+    headers: {'Content-Type':'application/json','Content-Length': data.length}
+  }, res=>console.log("Telegram status:", res.statusCode))
+  req.on('error', e=>console.log("TG error:", e.message))
+  req.write(data)
+  req.end()
+}
+
+async function getChatId(){
+  https.get(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates`, res=>{
+    let d=''; res.on('data',c=>d+=c); res.on('end',()=>{
+      console.log("getUpdates:", d)
+      try{
+        const j = JSON.parse(d)
+        if(j.result && j.result.length){
+          const last = j.result[j.result.length-1]
+          CHAT_ID = last.message.chat.id
+          console.log("CHAT_ID DETECTADO:", CHAT_ID)
+          sendTelegram("✅ Bot de chamba conectado. Ya te avisaré aquí cada que salga jale de acordeonero")
+        }
+      }catch(e){}
     })
-    req.on('error', e=>{
-      console.log("ntfy ERROR:", e.message)
-      reject(e.message)
-    })
-    req.write(mensaje)
-    req.end()
   })
 }
 
@@ -35,15 +47,15 @@ async function startBot(){
   sock.ev.on('connection.update', async (up)=>{
     if(up.qr){
       qrCodeData = await qrcode.toDataURL(up.qr)
-      status = "Escanea QR"
+      status = "Escanea QR WhatsApp"
     }
     if(up.connection==='open'){
-      status = "CONECTADO ✅"
+      status = "CONECTADO ✅ - Esperando tu ID de Telegram"
       qrCodeData = null
-      console.log("CONECTADO")
-      sendNtfy("Bot Conectado", "Prueba auto al conectar").catch(()=>{})
+      console.log("WA CONECTADO")
+      getChatId()
     }
-    if(up.connection==='close' && up.lastDisconnect?.error?.output?.statusCode != DisconnectReason.loggedOut){
+    if(up.connection==='close' && up.lastDisconnect?.error?.output?.statusCode!= DisconnectReason.loggedOut){
       setTimeout(()=>startBot(),3000)
     }
   })
@@ -53,23 +65,20 @@ async function startBot(){
     const txtRaw = msg.message.conversation || msg.message.extendedTextMessage?.text || ""
     if(!txtRaw) return
     const t = txtRaw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    if(!t.includes("acordeon") && !t.includes("acordion")) return
+    if(!t.includes("acordeon") &&!t.includes("acordion")) return
+    if(["vendo","venta","yo voy","disponible"].some(p=>t.includes(p))) return
     console.log("CHAMBA:", txtRaw)
-    sendNtfy("Chamba acordeon!", txtRaw).catch(()=>{})
+    sendTelegram(`🎹 CHAMBA DETECTADA:\n${txtRaw}`)
   })
 }
 
 app.get('/', (req,res)=>{
-  res.send(`<h1>${status}</h1><p>Topic: ${TOPIC}</p>${qrCodeData?`<img src="${qrCodeData}" width="300">`:''}<br><a href="/test-ntfy"><button style="font-size:20px;padding:15px;">PROBAR NTFY AHORA</button></a><script>setTimeout(()=>location.reload(),5000)</script>`)
+  res.send(`<h1>${status}</h1><p>CHAT_ID: ${CHAT_ID || 'aun no, manda HOLA a tu bot en Telegram'}</p>${qrCodeData?`<img src="${qrCodeData}" width="300">`:''}<br><br><a href="/getid"><button style="padding:15px;font-size:18px;">1. Manda HOLA a tu bot y luego pica AQUÍ para activar Telegram</button></a>`)
 })
 
-app.get('/test-ntfy', async (req,res)=>{
-  try{
-    const code = await sendNtfy("Prueba manual", "Si ves esto, ntfy SI jala desde Render")
-    res.send(`<h1>ntfy respondió: ${code}</h1><p>Si dice 200 y NO te llegó notificación, NO estás suscrito en la app ntfy al topic ${TOPIC}</p><a href="/">volver</a>`)
-  }catch(e){
-    res.send(`<h1>ERROR ntfy: ${e}</h1><p>Render está bloqueando ntfy.sh. Nos pasamos a Telegram.</p>`)
-  }
+app.get('/getid', (req,res)=>{
+  getChatId()
+  res.send(`<h1>Buscando tu ID...</h1><p>Revisa logs en Render, debe decir CHAT_ID DETECTADO. Luego vuelve a /</p><a href="/">volver</a>`)
 })
 
 app.listen(3000)
