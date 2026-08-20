@@ -1,33 +1,39 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const express = require('express');
+const fs = require('fs');
 const app = express();
 
 let lastQr = '';
 
+// BORRAR SESION VIEJA
+if (fs.existsSync('./.wwebjs_auth')) {
+    fs.rmSync('./.wwebjs_auth', { recursive: true, force: true });
+    console.log('Sesion vieja borrada');
+}
+
 app.get('/', async (req, res) => {
-    if (!lastQr) return res.send('BOT ACORDEON FINAL LISTO - Ya esta vinculado');
+    if (!lastQr) return res.send('<h1>Generando QR... espera 20 seg y recarga</h1><script>setTimeout(()=>location.reload(),5000)</script>');
     const qrImage = await qrcode.toDataURL(lastQr);
-    res.send(`<h1>Escanea este QR con WhatsApp</h1><img src="${qrImage}" style="width:300px"><script>setTimeout(()=>location.reload(),20000)</script>`);
+    res.send(`<h1>ESCANEA ESTE QR</h1><img src="${qrImage}" style="width:350px"><p>Se actualiza cada 20 seg</p><script>setTimeout(()=>location.reload(),20000)</script>`);
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Server en puerto 3000'));
+app.listen(process.env.PORT || 3000, () => console.log('Server puerto 3000'));
 
 const client = new Client({
-    authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process']
     }
 });
 
 client.on('qr', (qr) => {
-    console.log('QR GENERADO');
+    console.log('QR NUEVO GENERADO');
     lastQr = qr;
 });
 
 client.on('ready', () => {
-    console.log('BOT ACORDEON FINAL LISTO');
+    console.log('BOT LISTO');
     lastQr = '';
 });
 
@@ -37,8 +43,52 @@ client.on('message', async (msg) => {
     if (msg.body.toLowerCase() === 'hola') {
         msg.reply('Hola! Soy el bot de acordeones. Escribe *catalogo*');
     }
-    if (msg.body.toLowerCase() === 'catalogo') {
-        msg.reply('Catálogo de acordeones 🎹🪗');
+});
+
+client.initialize();const { Client } = require('whatsapp-web.js');
+const qrcode = require('qrcode');
+const express = require('express');
+const fs = require('fs');
+const app = express();
+
+let lastQr = '';
+
+// BORRAR SESION VIEJA
+if (fs.existsSync('./.wwebjs_auth')) {
+    fs.rmSync('./.wwebjs_auth', { recursive: true, force: true });
+    console.log('Sesion vieja borrada');
+}
+
+app.get('/', async (req, res) => {
+    if (!lastQr) return res.send('<h1>Generando QR... espera 20 seg y recarga</h1><script>setTimeout(()=>location.reload(),5000)</script>');
+    const qrImage = await qrcode.toDataURL(lastQr);
+    res.send(`<h1>ESCANEA ESTE QR</h1><img src="${qrImage}" style="width:350px"><p>Se actualiza cada 20 seg</p><script>setTimeout(()=>location.reload(),20000)</script>`);
+});
+
+app.listen(process.env.PORT || 3000, () => console.log('Server puerto 3000'));
+
+const client = new Client({
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process']
+    }
+});
+
+client.on('qr', (qr) => {
+    console.log('QR NUEVO GENERADO');
+    lastQr = qr;
+});
+
+client.on('ready', () => {
+    console.log('BOT LISTO');
+    lastQr = '';
+});
+
+client.on('message', async (msg) => {
+    const chat = await msg.getChat();
+    if (chat.isGroup) return;
+    if (msg.body.toLowerCase() === 'hola') {
+        msg.reply('Hola! Soy el bot de acordeones. Escribe *catalogo*');
     }
 });
 
